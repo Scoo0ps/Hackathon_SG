@@ -23,8 +23,8 @@ class RedditStockScraper:
         
         # Financial subreddits
         self.financial_subreddits = [
-            'investing', 'stocks', 'SecurityAnalysis', 
-            'StockMarket', 'wallstreetbets', 'finance', 
+            'investing', 'stocks', 
+            'StockMarket', 'wallstreetbets', 
             'options', 'eupersonalfinance', 'france', 'europe'
         ]
         
@@ -286,8 +286,8 @@ def main():
     
     # Method 1: Targeted keyword search (RECOMMENDED - Most Precise)
     print("🎯 METHOD 1: Targeted Keyword Search (Title + Content)")
-    scraper = RedditStockScraper(days_back=7)
-    scraper.scrape_all_stocks(method='search', limit_per_sub=30, time_filter='week')
+    scraper = RedditStockScraper(days_back=30)
+    scraper.scrape_all_stocks(method='search', limit_per_sub=30, time_filter='month')
     
     # Save and display results
     df = scraper.save_to_csv()

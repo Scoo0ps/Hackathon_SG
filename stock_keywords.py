@@ -1,5 +1,5 @@
 """
-Stock keywords database for Reddit scraping
+Stock keywords database for Reddit AND Twitter scraping
 Contains primary keywords (ticker symbols, company names) and context keywords (products, brands, CEOs)
 """
 
