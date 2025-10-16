@@ -66,7 +66,7 @@ def analyze_sentiment(texts, batch_size=32):
 
 
 # La fonction analyse_csv prend en paramètre le chemin d'un fichier CSV, le nom de la colonne texte (content)
-# et la colonne entreprise (stock_symbol) et elle renvoi en dictionnaire avec le sentiment pour chaque entreprise.
+# et le nom de la colonne de symbole boursier. et elle renvoi en dictionnaire avec le sentiment pour chaque entreprise.
 #
 # Pour ce faire, elle suit ces étapes :
 # 1. Elle vérifie que le fichier existe.

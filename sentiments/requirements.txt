@@ -9,6 +9,7 @@ beautifulsoup4==4.14.2
 certifi==2025.10.5
 cffi==2.0.0
 charset-normalizer==3.4.4
+click==8.3.0
 curl_cffi==0.13.0
 datasets==4.2.0
 dill==0.4.0
@@ -27,6 +28,7 @@ httpcore==1.0.9
 httpx==0.28.1
 huggingface-hub==0.35.3
 idna==3.11
+joblib==1.5.2
 keras==3.11.3
 libclang==18.1.1
 Markdown==3.9
@@ -38,6 +40,7 @@ multidict==6.7.0
 multiprocess==0.70.16
 multitasking==0.0.12
 namex==0.1.0
+nltk==3.9.2
 numpy==2.3.4
 opt_einsum==3.4.0
 optree==0.17.0
@@ -66,6 +69,7 @@ tensorboard==2.20.0
 tensorboard-data-server==0.7.2
 tensorflow==2.20.0
 termcolor==3.1.0
+textblob==0.19.0
 tf_keras==2.20.1
 tokenizers==0.22.1
 tqdm==4.67.1
