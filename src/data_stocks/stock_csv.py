@@ -7,10 +7,10 @@ os.makedirs("data", exist_ok=True)
 
 # Liste des tickers
 tickers = [
-    "AIR.PA", "BNP.PA", "SAN.PA", "MC.PA", "OR.PA",
-    "DG.PA", "SU.PA", "ENGI.PA", "CAP.PA", "KER.PA",
+    "AIR.PA", "BNP.PA", "SAN.PA", "MC.PA",
+    "DG.PA", "SU.PA", "ENGI.PA", "KER.PA",
     "AAPL", "MSFT", "GOOG", "AMZN", "META",
-    "NVDA", "TSLA", "PEP", "AVGO", "ADBE"
+    "NVDA", "TSLA", "PEP"
 ]
 
 # Période demandée
