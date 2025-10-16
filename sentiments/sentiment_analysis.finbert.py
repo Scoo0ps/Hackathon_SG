@@ -18,26 +18,38 @@ def aggregate_sentiment_scores(sentiment_scores):
 
 
 # La fonction analyze_sentiment prend en paramètre une liste de textes pour une entreprise et elle renvoie un dictionnaire
-# avec les 3 robabilités et le score global (Positif - Négatif).
+# avec les 3 probabilités et le score global (Positif - Négatif).
 #
 # Pour ce faire, elle suit ces étapes :
 # 1. Elle vérifie qu'il y a bien des textes à analyser.
-# 2. Elle transforme les textes en tokens compréhensibles par le modèle FinBERT.
-# 3. Le modèle prédit les scores de sentiment pour chaque texte.
-# 4. On convertit les scores en probabilités avec la fonction softmax.
-# 5. On agrège les scores en prenant la moyenne pour chaque catégorie de sentiment.
-# 6. On calcule le score global en soustrayant la probabilité Négative de la probabilité Positive.
+# 2. Elle compte le nombre de messages.
+# 3. Elle transforme les textes en tokens compréhensibles par le modèle FinBERT.
+# 4. Le modèle prédit les scores de sentiment pour chaque texte.
+# 5. On convertit les scores en probabilités avec la fonction softmax.
+# 6. On agrège les scores en prenant la moyenne pour chaque catégorie de sentiment.
+# 7. On calcule le score global en soustrayant la probabilité Négative de la probabilité Positive.
 
-def analyze_sentiment(texts):
+def analyze_sentiment(texts, batch_size=32):
     if not texts:
         return None
-    # Tokenisation et prédiction
-    inputs = tokenizer(texts, padding=True, truncation=True, return_tensors='tf')
-    outputs = model(**inputs)
-    scores = tf.nn.softmax(outputs.logits, axis=-1).numpy()
-    
-    # Agrégation par moyenne
-    aggregated_scores = aggregate_sentiment_scores(scores)
+
+    # Nombre de messages
+    message_count = len(texts)
+    all_scores= []
+
+    # Traitement par batch pour éviter les problèmes de mémoire
+    for i in range(0, message_count, batch_size):
+        batch_texts = texts[i:i+batch_size]
+        inputs = tokenizer(batch_texts, padding=True, truncation=True, return_tensors='tf')
+        outputs = model(**inputs)
+        scores = tf.nn.softmax(outputs.logits, axis=-1).numpy()
+        all_scores.append(scores)
+
+    # On concatène tous les scores
+    all_scores = np.concatenate(all_scores, axis=0)
+
+    # Moyenne des scores
+    aggregated_scores = aggregate_sentiment_scores(all_scores)
     
     # Score global = Positive - Negative
     global_score = float(aggregated_scores[2] - aggregated_scores[0])
@@ -46,14 +58,15 @@ def analyze_sentiment(texts):
         'Negative': float(aggregated_scores[0]),
         'Neutral': float(aggregated_scores[1]),
         'Positive': float(aggregated_scores[2]),
-        'GlobalScore': global_score
+        'GlobalScore': global_score,
+        'MessageCount': message_count
     }
 
 
 
 
 # La fonction analyse_csv prend en paramètre le chemin d'un fichier CSV, le nom de la colonne texte (content)
-# et la colonne entreprise (stock_symbol) et elle renvoi en dictionnaire avec le sentiment pour chaque entreprise.
+# et le nom de la colonne de symbole boursier. et elle renvoi en dictionnaire avec le sentiment pour chaque entreprise.
 #
 # Pour ce faire, elle suit ces étapes :
 # 1. Elle vérifie que le fichier existe.
@@ -82,8 +95,9 @@ def analyze_csv(file_path, text_column='content', symbol_column='stock_symbol'):
 
 
 if __name__ == "__main__":
-    file_path = "../reddit_stock_data_20251016_114603.csv"
+    file_path = "../reddit_stock_data_20251016_154138.csv"
     sentiment_by_stock = analyze_csv(file_path, text_column='content', symbol_column='stock_symbol')
     
     for stock, sentiment in sentiment_by_stock.items():
         print(f"{stock}: {sentiment}")
+
