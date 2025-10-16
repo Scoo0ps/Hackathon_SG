@@ -13,9 +13,17 @@ tickers = [
     "NVDA", "TSLA", "PEP"
 ]
 
-# Période demandée
-start_date = "2025-09-15"
-end_date = "2025-10-15"
+from datetime import datetime, timedelta
+
+# Date d'hier
+end_date = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+
+# Date 30 jours avant hier
+start_date = (datetime.now() - timedelta(days=31)).strftime('%Y-%m-%d')
+
+print("start_date =", start_date)
+print("end_date =", end_date)
+
 
 for ticker in tickers:
     print(f"Téléchargement de {ticker}...")
