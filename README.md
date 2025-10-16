@@ -9,8 +9,7 @@ Mathias :
 python3 -m pip install --user virtualenv 
 
 Agathe :
-python3 -m pip install --user virtualenv --break-system-packages
-python3 -m virtualenv ~/venv
+python3 -m pip install --user virtualenv --break-system-packages | python3 -m virtualenv ~/venv
 
 
 
