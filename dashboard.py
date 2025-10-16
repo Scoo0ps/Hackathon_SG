@@ -1,91 +1,226 @@
-import dash
-from dash import dcc, html
-from dash.dependencies import Input, Output
+import streamlit as st
 import pandas as pd
+import numpy as np
+from datetime import datetime, timedelta
 import plotly.express as px
+import plotly.graph_objects as go
 
-# ============================
-# Liste des entreprises
-# ============================
-companies = [
-    "AIR.PA", "BNP.PA", "SAN.PA", "MC.PA", "OR.PA", "DG.PA", "SU.PA", "ENGI.PA",
-    "CAP.PA", "KER.PA", "AAPL", "MSFT", "GOOG", "AMZN", "META", "NVDA", "TSLA",
-    "PEP", "AVGO", "ADBE"
-]
+# ==========================
+# 🎨 CONFIG
+# ==========================
+st.set_page_config(page_title="SG Market & Sentiment Dashboard", layout="wide")
 
-# ============================
-# Charger les CSV
-# ============================
-# Attention : les fichiers doivent être nommés par exemple :
-# "AIR.PA_prices.csv" et "AIR.PA_sentiment.csv"
-# avec colonnes :
-# - prices CSV : "date","fluctuation" (en %)
-# - sentiment CSV : "date","score" (entre -1 et 1 ou 0-1)
-def load_data(company):
-    df_price = pd.read_csv(f"data/{company}_prices.csv", parse_dates=["date"])
-    df_sentiment = pd.read_csv(f"data/{company}_sentiment.csv", parse_dates=["date"])
-    return df_price, df_sentiment
+COLORS = {
+    "bg": "#121212",           # background noir
+    "card": "#2A2A2A",         # cartes gris foncé
+    "inner": "#D9D9D9",        # intérieur gris très clair
+    "text": "#FFFFFF",         # texte blanc
+    "accent": "#D90429",       # rouge SG
+    "gray": "#8D99AE",
+    "border": "#000000",
+    "lightgray": "#BDBDBD"
+}
 
-# ============================
-# Créer l'app Dash
-# ============================
-app = dash.Dash(__name__)
-app.title = "Sentiment vs Market Dashboard"
-
-app.layout = html.Div([
-    html.H1("📊 Sentiment et Fluctuation des Actions", style={"textAlign": "center"}),
-
-    # Dropdown pour choisir l'entreprise
-    html.Div([
-        html.Label("Sélectionnez une entreprise :"),
-        dcc.Dropdown(
-            id="company-dropdown",
-            options=[{"label": c, "value": c} for c in companies],
-            value="AAPL",  # valeur par défaut
-            clearable=False
-        )
-    ], style={"width": "40%", "margin": "auto"}),
-
-    html.Br(),
-
-    # Graphiques
-    dcc.Graph(id="price-graph"),
-    dcc.Graph(id="sentiment-graph")
-])
-
-# ============================
-# Callback pour mettre à jour les graphiques
-# ============================
-@app.callback(
-    [Output("price-graph", "figure"),
-     Output("sentiment-graph", "figure")],
-    [Input("company-dropdown", "value")]
+# ==========================
+# CSS Global
+# ==========================
+st.markdown(
+    f"""
+    <style>
+    .block-container {{
+        padding: 1rem 2rem 1rem 2rem;
+        background-color: {COLORS['bg']};
+        color: {COLORS['text']};
+    }}
+    h1, h2, h3, h4, h5, h6, p, label {{
+        color: {COLORS['text']};
+    }}
+    .stSelectbox, .stRadio > div {{
+        background-color: {COLORS['card']};
+        color: {COLORS['text']};
+        border-radius: 10px;
+        padding: 6px 10px;
+    }}
+    button[kind="secondary"] {{
+        background-color: {COLORS['bg']} !important;
+        color: {COLORS['text']} !important;
+        border: none !important;
+        border-radius: 50%;
+        width: 38px !important;
+        height: 38px !important;
+        font-size: 18px !important;
+    }}
+    </style>
+    """,
+    unsafe_allow_html=True
 )
-def update_graphs(selected_company):
-    df_price, df_sentiment = load_data(selected_company)
 
-    # Graphique des fluctuations
-    fig_price = px.line(
-        df_price, x="date", y="fluctuation",
-        title=f"Fluctuation journalière du prix : {selected_company}",
-        labels={"fluctuation":"% fluctuation", "date":"Date"}
+# ==========================
+# COMPANY NAMES
+# ==========================
+companies = {
+    "AIR.PA": "Airbus SE",
+    "BNP.PA": "BNP Paribas SA",
+    "SAN.PA": "Sanofi SA",
+    "MC.PA": "LVMH Moët Hennessy Louis Vuitton SE",
+    "OR.PA": "L'Oréal SA",
+    "DG.PA": "Vinci SA",
+    "SU.PA": "Schneider Electric SE",
+    "ENGI.PA": "Engie SA",
+    "CAP.PA": "Capgemini SE",
+    "KER.PA": "Kering SA",
+    "AAPL": "Apple Inc.",
+    "MSFT": "Microsoft Corporation",
+    "GOOG": "Alphabet Inc. (Google)",
+    "AMZN": "Amazon.com Inc.",
+    "META": "Meta Platforms Inc.",
+    "NVDA": "NVIDIA Corporation",
+    "TSLA": "Tesla Inc.",
+    "PEP": "PepsiCo Inc.",
+    "AVGO": "Broadcom Inc.",
+    "ADBE": "Adobe Inc."
+}
+
+# ==========================
+# FAKE DATA
+# ==========================
+days = 30
+dates = pd.date_range(end=datetime.today(), periods=days)
+np.random.seed(42)
+df = pd.DataFrame({
+    "date": dates,
+    "open": np.random.uniform(150, 200, days),
+    "close": np.random.uniform(150, 200, days),
+    "high": np.random.uniform(200, 220, days),
+    "low": np.random.uniform(140, 160, days),
+    "volume": np.random.randint(1_000_000, 5_000_000, days),
+    "price_change_pct": np.random.uniform(-5, 5, days),
+    "sentiment": np.random.uniform(-1, 1, days),
+    "nb_messages": np.random.randint(100, 1000, days)
+})
+
+# ==========================
+# HEADER
+# ==========================
+st.markdown(
+    f"""
+    <div style='margin-top:20px;'>
+        <h1 style='color:{COLORS['accent']}; text-align:center; font-size:54px; font-weight:900; margin-bottom:20px;'>
+            SG Market & Sentiment Dashboard
+        </h1>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+# ==========================
+# FILTERS
+# ==========================
+st.markdown("<div style='display:flex; justify-content:space-between; align-items:center;'>", unsafe_allow_html=True)
+mode = st.selectbox("Select Mode:", ["⚡ Fast & less accurate", "⏳ Slow & more accurate"], index=0)
+selected_company = st.selectbox("Select Company:", list(companies.values()), index=10)
+apply_filters = st.button("Apply Filters")
+st.markdown("</div>", unsafe_allow_html=True)
+
+# ==========================
+# ONLY UPDATE IF APPLIED
+# ==========================
+if apply_filters:
+    # Latest KPI
+    latest = df.iloc[-1]
+    kpi_cols = st.columns(5)
+    metrics = {
+        "Open": latest["open"],
+        "Close": latest["close"],
+        "High": latest["high"],
+        "Low": latest["low"],
+        "Sentiment": latest["sentiment"]
+    }
+    for i, (label, value) in enumerate(metrics.items()):
+        with kpi_cols[i]:
+            st.markdown(
+                f"""
+                <div style="
+                    background-color:{COLORS['inner']};
+                    padding:25px;
+                    border-radius:15px;
+                    border: 1px solid {COLORS['border']};
+                    text-align:center;
+                    height: 120px;
+                    display:flex;
+                    flex-direction:column;
+                    justify-content:center;
+                ">
+                    <h2 style='color:{COLORS['accent']}; margin:0; font-size:38px; font-weight:800;'>{value:.2f}</h2>
+                    <p style='color:{COLORS['card']}; margin:0; font-size:16px;'>{label}</p>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ==========================
+    # MAIN GRAPHS
+    # ==========================
+    if "view" not in st.session_state:
+        st.session_state.view = 1
+
+    title_text = (
+        "📈 Price % Change & Sentiment Score (30 days)"
+        if st.session_state.view == 1
+        else "📊 Trading Volume & Message Count (30 days)"
     )
-    fig_price.update_traces(line=dict(color="#1f77b4", width=3))
-    fig_price.update_layout(template="plotly_white")
 
-    # Graphique du sentiment
-    fig_sentiment = px.line(
-        df_sentiment, x="date", y="score",
-        title=f"Score de sentiment quotidien : {selected_company}",
-        labels={"score":"Sentiment Score", "date":"Date"}
-    )
-    fig_sentiment.update_traces(line=dict(color="#ff7f0e", width=3))
-    fig_sentiment.update_layout(template="plotly_white")
+    # Titre + flèche noire à droite
+    col_graph_title = st.columns([9, 0.5])
+    with col_graph_title[0]:
+        st.markdown(
+            f"<h2 style='color:{COLORS['text']}; font-weight:700; margin-bottom:10px;'>{title_text}</h2>",
+            unsafe_allow_html=True
+        )
+    with col_graph_title[1]:
+        if st.button("➡️", key="toggle_graph", help="Switch graph view", use_container_width=True):
+            st.session_state.view = 2 if st.session_state.view == 1 else 1
 
-    return fig_price, fig_sentiment
+    fig = go.Figure()
+    if st.session_state.view == 1:
+        fig.add_trace(go.Scatter(
+            x=df["date"], y=df["price_change_pct"],
+            name="% Price Change",
+            line=dict(color=COLORS["accent"], width=3)
+        ))
+        fig.add_trace(go.Scatter(
+            x=df["date"], y=df["sentiment"],
+            name="Sentiment Score",
+            yaxis="y2",
+            line=dict(color=COLORS["gray"], width=2, dash="dot")
+        ))
+        fig.update_layout(
+            xaxis_title="Date",
+            yaxis=dict(title="% Price Change"),
+            yaxis2=dict(title="Sentiment Score", overlaying="y", side="right"),
+            template="plotly_dark",
+            height=450,
+            margin=dict(l=10, r=10, t=40, b=20)
+        )
+    else:
+        fig.add_trace(go.Scatter(
+            x=df["date"], y=df["volume"],
+            name="Trading Volume",
+            line=dict(color=COLORS["accent"], width=3)
+        ))
+        fig.add_trace(go.Scatter(
+            x=df["date"], y=df["nb_messages"],
+            name="Messages/Posts",
+            line=dict(color=COLORS["lightgray"], width=2)
+        ))
+        fig.update_layout(
+            xaxis_title="Date",
+            yaxis_title="Volume / Messages",
+            template="plotly_dark",
+            height=450,
+            margin=dict(l=10, r=10, t=40, b=20)
+        )
 
-# ============================
-# Lancer l'app
-# ============================
-if __name__ == "__main__":
-    app.run_server(debug=True)
+    st.plotly_chart(fig, use_container_width=True)
