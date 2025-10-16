@@ -1,33 +1,35 @@
-import tensorflow as tf
-from transformers import TFBertForSequenceClassification, BertTokenizer, set_seed
 import pandas as pd
 import numpy as np
 import os
+import tensorflow as tf
 
-# Fixer la seed pour la reproductibilité
-set_seed(1, True)
-
-# Charger le modèle et le tokenizer FinBERT
-model_path = "ProsusAI/finbert"
-tokenizer = BertTokenizer.from_pretrained(model_path)
-model = TFBertForSequenceClassification.from_pretrained(model_path)
+# Importer le modèle et le tokenizer chargés une seule fois
+from finbert_model import model, tokenizer
 
 def aggregate_sentiment_scores(sentiment_scores):
-    """ Agrège les scores de sentiment en faisant simplement la moyenne """
+    """ Agrège les scores de sentiment en faisant la moyenne """
     return sentiment_scores.mean(axis=0)
 
 def analyze_sentiment(texts):
-    """ Analyse le sentiment d'une liste de textes """
+    """ Analyse le sentiment d'une liste de textes et retourne les 3 probabilités + score global """
     if not texts:
         return None
+    # Tokenisation et prédiction
     inputs = tokenizer(texts, padding=True, truncation=True, return_tensors='tf')
     outputs = model(**inputs)
     scores = tf.nn.softmax(outputs.logits, axis=-1).numpy()
+    
+    # Agrégation par moyenne
     aggregated_scores = aggregate_sentiment_scores(scores)
+    
+    # Score global = Positive - Negative
+    global_score = float(aggregated_scores[2] - aggregated_scores[0])
+    
     return {
         'Negative': float(aggregated_scores[0]),
         'Neutral': float(aggregated_scores[1]),
-        'Positive': float(aggregated_scores[2])
+        'Positive': float(aggregated_scores[2]),
+        'GlobalScore': global_score
     }
 
 def analyze_csv(file_path, text_column='content', symbol_column='stock_symbol'):
@@ -49,9 +51,8 @@ def analyze_csv(file_path, text_column='content', symbol_column='stock_symbol'):
 
 # Exemple d'utilisation
 if __name__ == "__main__":
-    file_path = "reddit_stock_data_20251016_114603.csv"  # Remplace par le chemin réel de ton CSV
+    file_path = "../reddit_stock_data_20251016_114603.csv"  # Remplacer par ton CSV
     sentiment_by_stock = analyze_csv(file_path, text_column='content', symbol_column='stock_symbol')
     
-    # Affichage des résultats
     for stock, sentiment in sentiment_by_stock.items():
         print(f"{stock}: {sentiment}")
