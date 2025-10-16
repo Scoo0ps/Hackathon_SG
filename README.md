@@ -9,7 +9,9 @@ Mathias :
 python3 -m pip install --user virtualenv 
 
 Agathe :
-python3 -m pip install --user virtualenv --break-system-packages | python3 -m virtualenv ~/venv
+python3 -m pip install --user virtualenv --break-system-packages 
+
+python3 -m virtualenv ~/venv
 
 
 
@@ -17,8 +19,11 @@ python3 -m pip install --user virtualenv --break-system-packages | python3 -m vi
 
 Comment activer son environnement :
 
+Mathias :
 source venv/bin/activate
 
+Agathe :
+source ~/venv/bin/activate
 
 
 installer depuis le fichier de requirements:
