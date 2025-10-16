@@ -58,5 +58,6 @@ if __name__ == "__main__":
     if "AAPL" in data:
         print("\n=== 🧾 DataFrame complet pour AAPL ===")
         print(data["AAPL"])
+        print(data["AAPL"]["Open"].head())
     else:
         print("\n⚠️ AAPL n'est pas présent dans les données téléchargées.")

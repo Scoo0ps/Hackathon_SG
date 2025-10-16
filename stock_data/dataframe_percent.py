@@ -62,3 +62,4 @@ if __name__ == "__main__":
     df_pct = get_pct_change_df()
     print("\n=== 🧾 DataFrame des % d'évolution journalière ===")
     print(df_pct.head())
+    print(df_pct["AAPL"])
