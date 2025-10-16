@@ -6,10 +6,26 @@ import os
 os.makedirs("data", exist_ok=True)
 
 tickers = [
-    "AIR.PA", "BNP.PA", "SAN.PA", "MC.PA", "OR.PA",
-    "DG.PA", "SU.PA", "ENGI.PA", "CAP.PA", "KER.PA",
-    "AAPL", "MSFT", "GOOG", "AMZN", "META",
-    "NVDA", "TSLA", "PEP", "AVGO", "ADBE"
+    "AIR.PA",  # Airbus SE
+    "BNP.PA",  # BNP Paribas SA
+    "SAN.PA",  # Sanofi SA
+    "MC.PA",   # LVMH Moët Hennessy Louis Vuitton SE
+    "OR.PA",   # L'Oréal SA
+    "DG.PA",   # Vinci SA
+    "SU.PA",   # Schneider Electric SE
+    "ENGI.PA", # Engie SA
+    "CAP.PA",  # Capgemini SE
+    "KER.PA",  # Kering SA
+    "AAPL",    # Apple Inc.
+    "MSFT",    # Microsoft Corporation
+    "GOOG",    # Alphabet Inc. (Google)
+    "AMZN",    # Amazon.com Inc.
+    "META",    # Meta Platforms Inc. (Facebook)
+    "NVDA",    # NVIDIA Corporation
+    "TSLA",    # Tesla Inc.
+    "PEP",     # PepsiCo Inc.
+    "AVGO",    # Broadcom Inc.
+    "ADBE"     # Adobe Inc.
 ]
 
 all_data = []
