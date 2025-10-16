@@ -17,7 +17,6 @@ for filename in os.listdir(clean_folder):
 print("\nTickers chargés :", list(dfs.keys()))
 
 
-
 # Aperçu d’un DataFrame (AAPL)
 print("\n--- Aperçu de AAPL ---")
 print(dfs["AAPL"].head())
