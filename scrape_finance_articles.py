@@ -148,9 +148,11 @@ def scrape_bloomberg(playwright, company):
 
 
 if __name__ == "__main__":
-    companies = "Apple"
+    company = "Apple"
     
     with sync_playwright() as playwright:
-        articles_df = scrape_bloomberg(playwright, )
+        articles_df = scrape_bloomberg(playwright, company)
     
     print(articles_df)
+
+    
