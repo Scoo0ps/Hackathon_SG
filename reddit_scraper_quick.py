@@ -279,6 +279,7 @@ class RedditStockScraper:
         df = pd.DataFrame(self.scraped_data)
         df = df.drop_duplicates(subset=['message_id'])
         df = df.sort_values('created_utc', ascending=False)
+        df['source'] = 'reddit'
         return df
     
     def save_to_csv(self, df=None, filename=None):

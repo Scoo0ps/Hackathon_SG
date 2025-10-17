@@ -121,3 +121,10 @@ def add_stock(ticker, primary_keywords, context_keywords, company_name):
         "context": context_keywords,
         "company": company_name
     }
+
+def get_company_from_ticker(ticker):
+    """Get company name from ticker symbol"""
+    stock_info = STOCK_KEYWORDS.get(ticker, None)
+    if stock_info:
+        return stock_info["company"]
+    return None
