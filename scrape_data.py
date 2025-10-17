@@ -22,6 +22,10 @@ def scrape(ticker:str, days_back:int=30, max_workers:int=8) -> pd.DataFrame:
     return combined_df
 
 if __name__ == "__main__":
-    ticker = "MC.PA"
+    ticker = "AAPL"
     combined_articles_df = scrape(ticker)
-    print(combined_articles_df)
+    print(combined_articles_df["content"])
+    bloomberg_nb = combined_articles_df[combined_articles_df["source"] == "bloomberg"].shape[0]
+    reddit_nb = combined_articles_df[combined_articles_df["source"] == "reddit"].shape[0]
+
+    print(f"Bloomberg articles: {bloomberg_nb}, Reddit articles: {reddit_nb}")
