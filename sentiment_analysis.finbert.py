@@ -17,7 +17,7 @@ tokenizer = BertTokenizer.from_pretrained(model_path)
 model = TFBertForSequenceClassification.from_pretrained(model_path)
 
 
-from reddit_scraper import RedditStockScraper
+from reddit_scraper_quick import RedditStockScraper
 
 
 # La fonction aggregate_sentiment_scores prend en paramètre une liste de scores de sentiment pour chaque texte d'entreprise
@@ -70,9 +70,9 @@ def analyze_sentiment(texts, batch_size=32):
 
 
 def analyze_single_stock(ticker):
-    scraper = RedditStockScraper(days_back=30)
+    scraper = RedditStockScraper(days_back=30, max_workers=8)
 
-    df = scraper.search_single_stock(ticker, limit_per_sub=30, time_filter='month')
+    df = scraper.search_single_stock(ticker, limit_per_sub=20, time_filter='month')
 
     if df.empty:
         print(f"Aucune donnée trouvée pour le ticker {ticker}.")

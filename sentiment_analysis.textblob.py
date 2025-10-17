@@ -3,7 +3,7 @@ import numpy as np
 import os
 from textblob import TextBlob
 
-from reddit_scraper import RedditStockScraper
+from reddit_scraper_quick import RedditStockScraper
 
 def analyze_sentiment_textblob(texts):
     if not texts:
@@ -23,8 +23,8 @@ def analyze_sentiment_textblob(texts):
 
 
 def analyze_single_stock_textblob(ticker):
-    scraper = RedditStockScraper(days_back=30)
-    df = scraper.search_single_stock(ticker, limit_per_sub=30, time_filter='month')
+    scraper = RedditStockScraper(days_back=30, max_workers=8)
+    df = scraper.search_single_stock(ticker, limit_per_sub=20, time_filter='month')
 
     if df.empty:
         print(f"Aucune donnée trouvée pour le ticker {ticker}.")
