@@ -6,7 +6,6 @@ import os
 import tensorflow as tf
 
 
-
 # Variables globales pour le modèle et le tokenizer
 model = None
 tokenizer = None
@@ -70,12 +69,11 @@ def analyze_sentiment(texts, batch_size=32):
 
     # Moyenne des scores
     aggregated_scores = aggregate_sentiment_scores(all_scores)
-    
+
     # Score global = Positive - Negative
     # Si le score global est >0, le sentiment global est plutôt positif, s'il est <0, il est plutôt négatif
     global_score = float(aggregated_scores[2] - aggregated_scores[0])
-    
-    # 
+
     return {
         'Negative': float(aggregated_scores[0]),
         'Neutral': float(aggregated_scores[1]),
@@ -134,7 +132,7 @@ def analyze_single_stock(ticker):
     if not daily_results:
         print(f"Aucun résultat journalier pour {ticker}.")
         return None
-    
+
     result_df = pd.DataFrame(daily_results)
     return result_df
 
