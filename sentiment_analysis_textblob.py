@@ -32,6 +32,10 @@ def analyze_single_stock_textblob(ticker):
 
     df['created_utc'] = pd.to_datetime(df['created_utc']).dt.date
 
+    counts = df['source'].value_counts()
+    nb_reddit = counts.get('reddit', 0)
+    nb_bloomberg = counts.get('bloomberg', 0)
+
     daily_results = []
 
     for day, group in df.groupby('created_utc'):
@@ -48,6 +52,8 @@ def analyze_single_stock_textblob(ticker):
             'company_name': df['company_name'].iloc[0] if 'company_name' in df.columns else ticker,
             'GlobalScore': sentiment_result['GlobalScore'],
             'MessageCount': sentiment_result['MessageCount'],
+            'NbRedditTot': nb_reddit,
+            'NbBloombergTot': nb_bloomberg,
             'analysis_date': day           
         })
 
@@ -70,7 +76,6 @@ def main_analyse_textblob(ticker):
     else:
         print(f"Aucun résultat d'analyse de sentiment TextBlob pour {ticker}.")
         return None
-
 
 if __name__ == "__main__":
     ticker = "AAPL"
