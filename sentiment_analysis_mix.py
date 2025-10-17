@@ -37,8 +37,8 @@ def analyze_single_stock_mixed(ticker):
         result_row = {
             'stock_symbol': ticker,
             'company_name': df['company_name'].iloc[0] if 'company_name' in df.columns else ticker,
-            'NbReddit': nb_reddit,
-            'NbBloomberg': nb_bloomberg,
+            'NbRedditTot': nb_reddit,
+            'NbBloombergTot': nb_bloomberg,
             'analysis_date': day
         }
 

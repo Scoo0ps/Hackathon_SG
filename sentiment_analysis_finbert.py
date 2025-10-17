@@ -102,8 +102,8 @@ def analyze_single_stock(ticker):
     df['created_utc'] = pd.to_datetime(df['created_utc']).dt.date
 
     counts = df['source'].value_counts()
-    nb_reddit = counts.get('Reddit', 0)
-    nb_bloomberg = counts.get('Bloomberg', 0)
+    nb_reddit = counts.get('reddit', 0)
+    nb_bloomberg = counts.get('bloomberg', 0)
 
     daily_results = []
 
@@ -124,8 +124,8 @@ def analyze_single_stock(ticker):
             'Positive': sentiment_result['Positive'],
             'GlobalScore': sentiment_result['GlobalScore'],
             'MessageCount': sentiment_result['MessageCount'],
-            'NbReddit': nb_reddit,
-            'NbBloomberg': nb_bloomberg,
+            'NbRedditTot': nb_reddit,
+            'NbBloombergTot': nb_bloomberg,
             'analysis_date': day           
         })
 
