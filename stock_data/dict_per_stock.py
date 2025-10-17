@@ -2,14 +2,10 @@ import yfinance as yf
 import pandas as pd
 from datetime import datetime, timedelta
 
-import sys
-import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from stock_keywords import STOCK_KEYWORDS, get_all_tickers 
 
 
 def get_stock_data(
-    tickers = get_all_tickers(),
+    tickers,
     days_back=30,
     include_today=True
 ):
@@ -17,7 +13,7 @@ def get_stock_data(
     Télécharge les données boursières pour une liste de tickers via yfinance.
     
     Args:
-        tickers (list): Liste des symboles boursiers à télécharger.
+        tickers (str): Symbole boursier à télécharger.
         days_back (int): Nombre de jours à remonter dans le passé.
         include_today (bool): Si True, la période s’arrête à aujourd’hui.
     
@@ -52,7 +48,7 @@ def get_stock_data(
 
 # --- TEST DE LA FONCTION ---
 if __name__ == "__main__":
-    data = get_stock_data()  # ⬅️ Appel de la fonction
+    data = get_stock_data(tickers="AAPL", days_back=10)  # ⬅️ Appel de la fonction
 
     # --- AFFICHAGE DU DATAFRAME AAPL ---
     if "AAPL" in data:
