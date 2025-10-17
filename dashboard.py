@@ -8,6 +8,8 @@ import plotly.express as px
 from stock_data.dict_per_stock import get_stock_data
 from stock_data.dataframe_percent import get_pct_change_df
 from sentiment_analysis_textblob import main_analyse_textblob
+from correlation import score_compatibilite_df
+
 
 # ==========================
 # CONFIG
@@ -296,14 +298,62 @@ if st.session_state.mode == "⏳ Slow & more accurate":
 else:
     col_gauge, col_pie2 = st.columns([1,2])
 
-# Jauge
+# ==========================
+# JAUGE - Performance Score (Compatibilité)
+# ==========================
 with col_gauge:
-    gauge_value = 42
-    fig_gauge = go.Figure(go.Indicator(mode="gauge+number", value=gauge_value,
-                                       gauge={'axis':{'range':[0,100]}, 'bar':{'color':COLORS['accent']}, 'bgcolor':GRAPH_BG},
-                                       number={'suffix':'%','font':{'color':'#333333', 'size': 24}}, 
-                                       title={'text':"Performance Score", 'font':{'color':'#333333', 'size': 16, 'family': 'Arial'}}))
-    fig_gauge.update_layout(height=GRAPH_HEIGHT, paper_bgcolor=GRAPH_BG, margin=dict(l=20,r=20,t=60,b=20))
+    try:
+        if not df_sentiment.empty:
+            # Convertir le sentiment en dict
+            y2_dict = {
+                "GlobalScore": df_sentiment["GlobalScore"].tolist(),
+                "analysis_date": df_sentiment["analysis_date"].astype(str).tolist()
+            }
+
+            # Récupérer les % de variation du titre sur la même période
+            y1 = get_pct_change_df(ticker)
+            min_date = pd.to_datetime(min(y2_dict["analysis_date"]))
+            max_date = pd.to_datetime(max(y2_dict["analysis_date"]))
+            y1 = y1.loc[min_date:max_date]
+
+            # Calcul du score
+            gauge_value = score_compatibilite_df(y1, y2_dict)
+        else:
+            gauge_value = np.nan
+    except Exception as e:
+        st.warning(f"Erreur lors du calcul du score de compatibilité : {e}")
+        gauge_value = np.nan
+
+    # ✅ Couleur dynamique selon la valeur
+    if np.isnan(gauge_value):
+        gauge_value = 0
+        gauge_color = "#BDBDBD"
+    elif gauge_value >= 70:
+        gauge_color = "#00C853"  # vert
+    elif gauge_value >= 40:
+        gauge_color = "#FFD600"  # jaune
+    else:
+        gauge_color = "#D90429"  # rouge
+
+    # ✅ Création de la jauge Plotly
+    fig_gauge = go.Figure(go.Indicator(
+        mode="gauge+number",
+        value=gauge_value,
+        gauge={
+            'axis': {'range': [0, 100]},
+            'bar': {'color': gauge_color},
+            'bgcolor': GRAPH_BG
+        },
+        number={'suffix': '%', 'font': {'color': '#333333', 'size': 24}},
+        title={'text': "Performance Score", 'font': {'color': '#333333', 'size': 16, 'family': 'Arial'}}
+    ))
+
+    fig_gauge.update_layout(
+        height=GRAPH_HEIGHT,
+        paper_bgcolor=GRAPH_BG,
+        margin=dict(l=20, r=20, t=60, b=20)
+    )
+
     st.plotly_chart(fig_gauge, use_container_width=True, config={"displayModeBar": False})
 
 # Pie sources

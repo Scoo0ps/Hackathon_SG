@@ -16,7 +16,8 @@ def score_compatibilite_df(y1: pd.DataFrame, y2: dict, col_name: str = None) -> 
 
     # Conversion dict -> DataFrame
     dates = pd.to_datetime(y2["analysis_date"])
-    values = y2["GlobalScore"]
+    values = np.array(y2["GlobalScore"]) * 100 # Passage à l'échelle 0-100
+    
     y2_df = pd.DataFrame(data={col_name: values}, index=dates)
 
     colonnes_communes = y1.columns.intersection(y2_df.columns)
@@ -48,7 +49,7 @@ def score_compatibilite_df(y1: pd.DataFrame, y2: dict, col_name: str = None) -> 
 
 # --- MAIN ---
 if __name__ == "__main__":
-    ticker = "AAPL"
+    ticker = "GOOG"
 
     # 1️⃣ Analyse du sentiment via Reddit (TextBlob)
     sentiment_df = main_analyse_textblob(ticker)
