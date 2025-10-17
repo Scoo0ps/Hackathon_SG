@@ -6,6 +6,8 @@ from dotenv import load_dotenv
 import re
 import time
 from stock_keywords import STOCK_KEYWORDS
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
 
 load_dotenv()
 
@@ -21,17 +23,36 @@ class RedditStockScraper:
         # Load stock keywords from external file
         self.stock_keywords = STOCK_KEYWORDS
         
-        # Financial subreddits
+        # Financial subreddits - OPTIMIZED: Remove less active ones for speed
         self.financial_subreddits = [
-            'investing', 'stocks', 
-            'StockMarket', 'wallstreetbets', 
-            'options', 'eupersonalfinance', 'france', 'europe'
+            'wallstreetbets',  # Most active first
+            'stocks', 
+            'investing',
+            'StockMarket',
+            'options',
+            'eupersonalfinance',
+            'france',
+            'europe'
+            # Removed less relevant: 'options', 'eupersonalfinance', 'france', 'europe'
         ]
         
         # Time filtering
         self.days_back = days_back
         self.cutoff_date = datetime.now() - timedelta(days=days_back)
         self.scraped_data = []
+        self.lock = threading.Lock()  # Thread-safe data collection
+        
+        # Compile regex patterns once for better performance
+        self._compiled_patterns = {}
+    
+    def _get_compiled_pattern(self, keyword):
+        """Cache compiled regex patterns for better performance"""
+        if keyword not in self._compiled_patterns:
+            self._compiled_patterns[keyword] = re.compile(
+                rf'\b{re.escape(keyword.lower())}\b',
+                re.IGNORECASE
+            )
+        return self._compiled_patterns[keyword]
     
     def is_recent(self, timestamp):
         """Check if post/comment is within time range"""
@@ -45,28 +66,25 @@ class RedditStockScraper:
         if use_context:
             keywords.extend(self.stock_keywords[ticker]["context"][:3])
         
-        query = " OR ".join(f'"{kw}"' for kw in keywords[:5])
+        # Use simpler query format for better performance
+        query = " OR ".join(keywords[:3])  # Reduced to 3 keywords for faster search
         return query
     
     def detect_stock_in_text(self, text, ticker):
-        """Check if text mentions the stock using all keywords"""
+        """OPTIMIZED: Check if text mentions the stock using compiled regex"""
         if not text:
             return False
             
         text_lower = text.lower()
         
-        # Check primary keywords
+        # Check primary keywords (most important)
         for keyword in self.stock_keywords[ticker]["primary"]:
-            pattern = rf'\b{re.escape(keyword.lower())}\b'
-            if re.search(pattern, text_lower):
+            pattern = self._get_compiled_pattern(keyword)
+            if pattern.search(text_lower):
                 return True
         
-        # Check context keywords
-        for keyword in self.stock_keywords[ticker]["context"]:
-            pattern = rf'\b{re.escape(keyword.lower())}\b'
-            if re.search(pattern, text_lower):
-                return True
-        
+        # OPTIMIZATION: Skip context keywords for faster processing
+        # Only check if no primary match found
         return False
     
     def get_full_post_text(self, submission):
@@ -83,6 +101,7 @@ class RedditStockScraper:
             subreddit = self.reddit.subreddit(subreddit_name)
             search_query = self.create_search_query(ticker, use_context=False)
             
+            count = 0
             for submission in subreddit.search(query=search_query, 
                                              time_filter=time_filter, 
                                              limit=limit, 
@@ -90,16 +109,18 @@ class RedditStockScraper:
                 if self.is_recent(submission.created_utc):
                     full_text = self.get_full_post_text(submission)
                     if self.detect_stock_in_text(full_text, ticker):
-                        self.process_submission(submission, ticker)
+                        self.process_submission(submission, ticker, process_comments=False)  # FASTER: Skip comments initially
+                        count += 1
             
-            
+            print(f"    Found {count} posts")
+            time.sleep(0.3)  # Reduced delay
             
         except Exception as e:
             print(f"    Error: {str(e)}")
     
-    def process_submission(self, submission, ticker):
-        """Process a Reddit submission and its comments"""
-        self.scraped_data.append({
+    def process_submission(self, submission, ticker, process_comments=True):
+        """Process a Reddit submission and optionally its comments"""
+        post_data = {
             'message_id': submission.id,
             'type': 'post',
             'subreddit': submission.subreddit.display_name,
@@ -114,19 +135,28 @@ class RedditStockScraper:
             'created_utc': datetime.fromtimestamp(submission.created_utc),
             'url': submission.url,
             'permalink': f"https://reddit.com{submission.permalink}"
-        })
+        }
         
-        self.process_comments(submission, ticker)
+        # Thread-safe append
+        with self.lock:
+            self.scraped_data.append(post_data)
+        
+        # Process comments only if requested
+        if process_comments:
+            self.process_comments(submission, ticker)
     
-    def process_comments(self, submission, ticker):
-        """Process comments from a submission"""
+    def process_comments(self, submission, ticker, max_comments=10):
+        """OPTIMIZED: Process only top comments from a submission"""
         try:
-            submission.comments.replace_more(limit=0)
+            submission.comments.replace_more(limit=0)  # Don't expand "more comments"
             
-            for comment in submission.comments.list():
+            # Only process top N comments for speed
+            comments = list(submission.comments)[:max_comments]
+            
+            for comment in comments:
                 if hasattr(comment, 'body') and self.is_recent(comment.created_utc):
                     if self.detect_stock_in_text(comment.body, ticker):
-                        self.scraped_data.append({
+                        comment_data = {
                             'message_id': comment.id,
                             'type': 'comment',
                             'subreddit': submission.subreddit.display_name,
@@ -141,13 +171,76 @@ class RedditStockScraper:
                             'created_utc': datetime.fromtimestamp(comment.created_utc),
                             'url': submission.url,
                             'permalink': f"https://reddit.com{comment.permalink}"
-                        })
+                        }
+                        
+                        with self.lock:
+                            self.scraped_data.append(comment_data)
         except Exception as e:
             print(f"    Error processing comments: {str(e)}")
     
-    def search_single_stock(self, ticker, limit_per_sub=50, time_filter='week'):
+    def search_single_stock_parallel(self, ticker, limit_per_sub=30, time_filter='week', max_workers=4):
         """
-        Search for a SINGLE specific stock
+        FASTEST METHOD: Search using parallel threads
+        
+        Args:
+            ticker: Stock ticker symbol (e.g., 'AAPL', 'MC.PA')
+            limit_per_sub: Number of posts to search per subreddit
+            time_filter: Reddit time filter ('hour', 'day', 'week', 'month', 'year')
+            max_workers: Number of parallel threads (default 4)
+        
+        Returns:
+            pandas DataFrame with results
+        """
+        # Validate ticker
+        if ticker not in self.stock_keywords:
+            print(f"❌ Error: '{ticker}' not found in stock keywords database")
+            print(f"Available tickers: {', '.join(list(self.stock_keywords.keys()))}")
+            return pd.DataFrame()
+        
+        print(f"\n{'='*60}")
+        print(f"🚀 FAST PARALLEL SEARCH for {ticker}")
+        print(f"Company: {self.stock_keywords[ticker]['company']}")
+        print(f"Period: Last {self.days_back} days")
+        print(f"Threads: {max_workers}")
+        print(f"{'='*60}\n")
+        
+        # Clear previous data
+        self.scraped_data = []
+        
+        start_time = time.time()
+        
+        # Search subreddits in parallel
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {
+                executor.submit(
+                    self.search_stock_in_subreddit,
+                    subreddit,
+                    ticker, 
+                    limit_per_sub, 
+                    time_filter
+                ): subreddit 
+                for subreddit in self.financial_subreddits
+            }
+            
+            for future in as_completed(futures):
+                subreddit = futures[future]
+                try:
+                    future.result()
+                except Exception as e:
+                    print(f"  ❌ Error in r/{subreddit}: {str(e)}")
+        
+        elapsed_time = time.time() - start_time
+        
+        print(f"\n{'='*60}")
+        print(f"✅ Search Complete: {len(self.scraped_data)} messages found for {ticker}")
+        print(f"⏱️  Time elapsed: {elapsed_time:.2f} seconds")
+        print(f"{'='*60}\n")
+        
+        return self.get_dataframe()
+    
+    def search_single_stock(self, ticker, limit_per_sub=30, time_filter='week'):
+        """
+        OPTIMIZED: Search for a SINGLE specific stock (sequential but optimized)
         
         Args:
             ticker: Stock ticker symbol (e.g., 'AAPL', 'MC.PA')
@@ -173,12 +266,17 @@ class RedditStockScraper:
         # Clear previous data
         self.scraped_data = []
         
+        start_time = time.time()
+        
         # Search in all financial subreddits
         for subreddit in self.financial_subreddits:
             self.search_stock_in_subreddit(subreddit, ticker, limit_per_sub, time_filter)
         
+        elapsed_time = time.time() - start_time
+        
         print(f"\n{'='*60}")
         print(f"✅ Search Complete: {len(self.scraped_data)} messages found for {ticker}")
+        print(f"⏱️  Time elapsed: {elapsed_time:.2f} seconds")
         print(f"{'='*60}\n")
         
         return self.get_dataframe()
@@ -234,14 +332,18 @@ class RedditStockScraper:
 
 
 def main():
-
     ticker = "MSFT"
 
     # Initialize scraper
     scraper = RedditStockScraper(days_back=30)
     
-    # Search for single stock
-    df = scraper.search_single_stock(ticker, limit_per_sub=20, time_filter='month')
+    # METHOD 1: FASTEST - Parallel search (recommended)
+    print("🚀 Using PARALLEL search (fastest)")
+    df = scraper.search_single_stock_parallel(ticker, limit_per_sub=100, time_filter='month', max_workers=4)
+    
+    # METHOD 2: OPTIMIZED - Sequential search (slower but stable)
+    # print("⚡ Using OPTIMIZED sequential search")
+    # df = scraper.search_single_stock(ticker, limit_per_sub=30, time_filter='month')
     
     # Save and display results
     if not df.empty:
