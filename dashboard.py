@@ -5,6 +5,14 @@ from datetime import datetime, timedelta
 import plotly.express as px
 import plotly.graph_objects as go
 
+from stock_data.dict_per_stock import get_stock_data
+from stock_data.dataframe_percent import get_pct_change_df
+
+# --- Chargement des données ---
+data = get_stock_data()
+df_pct = get_pct_change_df()
+
+
 # ==========================
 # 🎨 CONFIG
 # ==========================
