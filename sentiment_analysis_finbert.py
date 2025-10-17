@@ -1,4 +1,4 @@
- import tensorflow as tf
+import tensorflow as tf
 from transformers import TFBertForSequenceClassification, BertTokenizer, set_seed
 import pandas as pd
 import numpy as np
