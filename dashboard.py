@@ -10,7 +10,6 @@ from stock_data.dataframe_percent import get_pct_change_df
 from sentiment_analysis_textblob import main_analyse_textblob
 from correlation import score_compatibilite_df
 
-
 # ==========================
 # CONFIG
 # ==========================
@@ -77,13 +76,10 @@ st.markdown(
 STOCK_KEYWORDS = {
     # French CAC 40 Stocks
     "AIR.PA": {"company": "Airbus SE"},
-    "BNP.PA": {"company": "BNP Paribas SA"},
-    "SAN.PA": {"company": "Sanofi SA"},
     "MC.PA": {"company": "LVMH Moët Hennessy Louis Vuitton SE"},
     "DG.PA": {"company": "Vinci SA"},
     "SU.PA": {"company": "Schneider Electric SE"},
     "ENGI.PA": {"company": "Engie SA"},
-    "KER.PA": {"company": "Kering SA"},
     # US Tech & Blue Chip
     "AAPL": {"company": "Apple Inc."},
     "MSFT": {"company": "Microsoft Corporation"},
@@ -191,14 +187,12 @@ df_fin['date_only'] = df_fin['date'].dt.date
 if not df_sentiment.empty:
     df_fin = df_fin.merge(df_sentiment[['analysis_date', 'GlobalScore', 'MessageCount']], 
                           left_on='date_only', right_on='analysis_date', how='left')
-    # Remplir les valeurs manquantes de sentiment
-    nan_mask = df_fin['GlobalScore'].isna()
-    df_fin.loc[nan_mask, 'GlobalScore'] = np.random.uniform(-1, 1, size=nan_mask.sum())
+    # Si pas de messages, laisser NaN
     df_fin['sentiment'] = df_fin['GlobalScore']
     df_fin['nb_messages'] = df_fin['MessageCount']
     df_fin = df_fin.drop(['date_only', 'analysis_date', 'GlobalScore', 'MessageCount'], axis=1)
 else:
-    df_fin['sentiment'] = np.random.uniform(-1, 1, size=len(df_fin))
+    df_fin['sentiment'] = np.nan
     df_fin = df_fin.drop(['date_only'], axis=1)
 
 # ==========================
@@ -222,7 +216,12 @@ metrics = {
 }
 
 for i, (label, value) in enumerate(metrics.items()):
-    val_display = f"{value:.2f}" if value is not None and not pd.isna(value) else "--"
+    if label == "Volume" and value is not None and not pd.isna(value):
+        val_display = f"{value/1_000_000_000:.2f} B"
+    elif label != "Volume" and value is not None and not pd.isna(value):
+        val_display = f"{value:.2f}"
+    else:
+        val_display = "--"
     with kpi_cols[i]:
         st.markdown(
             f"""
@@ -264,11 +263,29 @@ fig_main = go.Figure()
 if st.session_state.view==1:
     fig_main.add_trace(go.Scatter(x=df_fin["date"], y=df_fin["price_change_pct"], name="% Price Change", line=dict(color=COLORS["accent"], width=3)))
     fig_main.add_trace(go.Scatter(x=df_fin["date"], y=df_fin["sentiment"], name="Sentiment Score", yaxis="y2", line=dict(color=COLORS["gray"], width=2, dash="dot")))
-    fig_main.update_layout(xaxis_title="Date", yaxis=dict(title="% Price Change"), yaxis2=dict(title="Sentiment Score", overlaying="y", side="right"), template="plotly_dark", height=450, margin=dict(l=10,r=10,t=40,b=20), plot_bgcolor=GRAPH_BG, paper_bgcolor=GRAPH_BG)
+    fig_main.update_layout(
+        xaxis_title="Date",
+        yaxis=dict(title="% Price Change"),
+        yaxis2=dict(title="Sentiment Score", overlaying="y", side="right"),
+        template="plotly_dark",
+        height=450,
+        margin=dict(l=10,r=10,t=40,b=20),
+        plot_bgcolor=GRAPH_BG,
+        paper_bgcolor=GRAPH_BG
+    )
 else:
     fig_main.add_trace(go.Scatter(x=df_fin["date"], y=df_fin["volume"], name="Trading Volume", line=dict(color=COLORS["accent"], width=3)))
     fig_main.add_trace(go.Scatter(x=df_fin["date"], y=df_fin["nb_messages"], name="Messages/Posts", yaxis="y2", line=dict(color=COLORS["lightgray"], width=2, dash="dot")))
-    fig_main.update_layout(xaxis_title="Date", yaxis=dict(title="Trading Volume"), yaxis2=dict(title="Messages/Posts", overlaying="y", side="right"), template="plotly_dark", height=450, margin=dict(l=10,r=10,t=40,b=20), plot_bgcolor=GRAPH_BG, paper_bgcolor=GRAPH_BG)
+    fig_main.update_layout(
+        xaxis_title="Date",
+        yaxis=dict(title="Trading Volume"),
+        yaxis2=dict(title="Messages/Posts", overlaying="y", side="right"),
+        template="plotly_dark",
+        height=450,
+        margin=dict(l=10,r=10,t=40,b=20),
+        plot_bgcolor=GRAPH_BG,
+        paper_bgcolor=GRAPH_BG
+    )
 
 st.plotly_chart(fig_main, use_container_width=True, config={"displayModeBar": False})
 
@@ -277,46 +294,53 @@ st.plotly_chart(fig_main, use_container_width=True, config={"displayModeBar": Fa
 # ==========================
 st.markdown("<br><br>", unsafe_allow_html=True)
 
-# Configuration commune pour tous les graphiques
-chart_title_font = dict(size=16, color="#333333", family="Arial")
+chart_title_font = dict(size=16, color="#333333", family="Arial", weight='bold')
 chart_font = dict(size=12, color="#333333", family="Arial")
 
-# Afficher les charts selon le mode
 if st.session_state.mode == "⏳ Slow & more accurate":
     col_pie1, col_gauge, col_pie2 = st.columns([2,1,2])
     
-    # Pie sentiment (uniquement en mode Slow)
+    # Pie sentiment
     with col_pie1:
         sentiment_counts = {
             "Positive": np.sum(df_fin["sentiment"] > 0.2),
             "Neutral": np.sum((df_fin["sentiment"] <= 0.2) & (df_fin["sentiment"] >= -0.2)),
             "Negative": np.sum(df_fin["sentiment"] < -0.2)
         }
-        fig_pie_sentiment = px.pie(names=list(sentiment_counts.keys()), values=list(sentiment_counts.values()), hole=0.4, color_discrete_sequence=[COLORS["accent"], COLORS["gray"], COLORS["inner"]], title="Sentiment Distribution")
-        fig_pie_sentiment.update_layout(paper_bgcolor=GRAPH_BG, plot_bgcolor=GRAPH_BG, title_font=chart_title_font, font=chart_font, height=GRAPH_HEIGHT, title_x=0.5)
+        fig_pie_sentiment = px.pie(
+            names=list(sentiment_counts.keys()),
+            values=list(sentiment_counts.values()),
+            hole=0.4,
+            color_discrete_sequence=[COLORS["accent"], COLORS["gray"], COLORS["inner"]],
+            title="Sentiment Distribution"
+        )
+        fig_pie_sentiment.update_layout(
+            paper_bgcolor=GRAPH_BG,
+            plot_bgcolor=GRAPH_BG,
+            title_font=chart_title_font,
+            font=chart_font,
+            height=GRAPH_HEIGHT,
+            title_x=0.5
+        )
         st.plotly_chart(fig_pie_sentiment, use_container_width=True, config={"displayModeBar": False})
 else:
     col_gauge, col_pie2 = st.columns([1,2])
 
 # ==========================
-# JAUGE - Performance Score (Compatibilité)
+# JAUGE - Performance Score
 # ==========================
 with col_gauge:
     try:
         if not df_sentiment.empty:
-            # Convertir le sentiment en dict
             y2_dict = {
                 "GlobalScore": df_sentiment["GlobalScore"].tolist(),
                 "analysis_date": df_sentiment["analysis_date"].astype(str).tolist()
             }
-
-            # Récupérer les % de variation du titre sur la même période
             y1 = get_pct_change_df(ticker)
             min_date = pd.to_datetime(min(y2_dict["analysis_date"]))
             max_date = pd.to_datetime(max(y2_dict["analysis_date"]))
             y1 = y1.loc[min_date:max_date]
 
-            # Calcul du score
             gauge_value = score_compatibilite_df(y1, y2_dict)
         else:
             gauge_value = np.nan
@@ -324,18 +348,16 @@ with col_gauge:
         st.warning(f"Erreur lors du calcul du score de compatibilité : {e}")
         gauge_value = np.nan
 
-    # ✅ Couleur dynamique selon la valeur
     if np.isnan(gauge_value):
         gauge_value = 0
         gauge_color = "#BDBDBD"
     elif gauge_value >= 70:
-        gauge_color = "#00C853"  # vert
+        gauge_color = "#00C853"
     elif gauge_value >= 40:
-        gauge_color = "#FFD600"  # jaune
+        gauge_color = "#FFD600"
     else:
-        gauge_color = "#D90429"  # rouge
+        gauge_color = "#D90429"
 
-    # ✅ Création de la jauge Plotly
     fig_gauge = go.Figure(go.Indicator(
         mode="gauge+number",
         value=gauge_value,
@@ -347,20 +369,33 @@ with col_gauge:
         number={'suffix': '%', 'font': {'color': '#333333', 'size': 24}},
         title={'text': "Performance Score", 'font': {'color': '#333333', 'size': 16, 'family': 'Arial'}}
     ))
-
     fig_gauge.update_layout(
         height=GRAPH_HEIGHT,
         paper_bgcolor=GRAPH_BG,
+        title_font=chart_title_font,
+        font=chart_font,
         margin=dict(l=20, r=20, t=60, b=20)
     )
-
     st.plotly_chart(fig_gauge, use_container_width=True, config={"displayModeBar": False})
 
 # Pie sources
 with col_pie2:
     sources = {"Twitter": np.random.randint(40,60), "Reddit": np.random.randint(40,60)}
-    fig_pie_sources = px.pie(names=list(sources.keys()), values=list(sources.values()), hole=0.4, color_discrete_sequence=[COLORS["accent"], COLORS["inner"]], title="Source Distribution")
-    fig_pie_sources.update_layout(paper_bgcolor=GRAPH_BG, plot_bgcolor=GRAPH_BG, title_font=chart_title_font, font=chart_font, height=GRAPH_HEIGHT, title_x=0.5)
+    fig_pie_sources = px.pie(
+        names=list(sources.keys()),
+        values=list(sources.values()),
+        hole=0.4,
+        color_discrete_sequence=[COLORS["accent"], COLORS["inner"]],
+        title="Source Distribution"
+    )
+    fig_pie_sources.update_layout(
+        paper_bgcolor=GRAPH_BG,
+        plot_bgcolor=GRAPH_BG,
+        title_font=chart_title_font,
+        font=chart_font,
+        height=GRAPH_HEIGHT,
+        title_x=0.5
+    )
     st.plotly_chart(fig_pie_sources, use_container_width=True, config={"displayModeBar": False})
 
 st.markdown(f"<div style='height:100px; background-color:{COLORS['bg']};'></div>", unsafe_allow_html=True)
