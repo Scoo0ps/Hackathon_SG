@@ -18,32 +18,30 @@ def score_compatibilite_df(y1: pd.DataFrame, y2: dict, col_name: str = None) -> 
     values = np.array(y2["GlobalScore"]) * 100 # Passage à l'échelle 0-100
     
     y2_df = pd.DataFrame(data={col_name: values}, index=dates)
+    print(y1)
+    print(y2_df)
+    
 
     colonnes_communes = y1.columns.intersection(y2_df.columns)
+
+    print(colonnes_communes)
+    
     if len(colonnes_communes) == 0:
         print("⚠️ Pas de colonnes communes entre y1 et y2")
         return np.nan
 
-    scores = []
-    for col in colonnes_communes:
-        s1, s2 = y1[col], y2_df[col]
-        s1, s2 = s1.align(s2, join='inner')
-        if len(s1) < 2:
-            continue
+    
+    s1, s2 = y1[colonnes_communes], y2_df[colonnes_communes]
+    s1, s2 = s1.align(s2, join='inner')
+    
+    a = ((s1 - s1.mean()) / s1.std()).iloc[:, 0].to_numpy()
+    b = ((s2 - s2.mean()) / s2.std()).iloc[:, 0].to_numpy()
 
-        a = (s1 - s1.mean()) / s1.std()
-        b = (s2 - s2.mean()) / s2.std()
+    corr = np.correlate(a, b, mode='full') / len(a)
+    r_max = np.max(corr)
+    score = (r_max + 1) / 2 * 100
 
-        corr = np.correlate(a, b, mode='full') / len(a)
-        r_max = np.max(corr)
-        score = (r_max + 1) / 2 * 100
-        scores.append(score)
-
-    if not scores:
-        print("⚠️ Pas assez de données valides pour calculer le score")
-        return np.nan
-
-    return np.mean(scores)
+    return score
 
 
 # --- MAIN ---
