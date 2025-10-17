@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 
 from stock_data.dataframe_percent import get_pct_change_df  # Ton module perso
 from sentiment_analysis_textblob import analyze_single_stock_textblob, analyze_single_stock_textblob, main_analyse_textblob   # Ton module perso
@@ -75,14 +74,3 @@ if __name__ == "__main__":
     # 3️⃣ Calcul du score de compatibilité
     score = score_compatibilite_df(y1, y2_dict)
     print(f"Score de compatibilité moyen : {score:.2f}/100")
-
-    # 4️⃣ Visualisation
-    plt.figure(figsize=(12, 6))
-    plt.plot(y1.index, y1.iloc[:, 0], label=f"{y1.columns[0]} (% de variation réelle)")
-    plt.plot(pd.to_datetime(y2_dict["analysis_date"]), y2_dict["GlobalScore"], label="Sentiment Reddit (GlobalScore)")
-    plt.title(f"{ticker} - Score de compatibilité : {score:.2f}/100")
-    plt.xlabel("Date")
-    plt.ylabel("Valeur")
-    plt.legend()
-    plt.grid(True)
-    plt.show()
