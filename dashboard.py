@@ -7,6 +7,7 @@ import plotly.express as px
 
 from stock_data.dict_per_stock import get_stock_data
 from stock_data.dataframe_percent import get_pct_change_df
+from sentiment_analysis_textblob import main_analyse_textblob
 
 # ==========================
 # CONFIG
@@ -24,8 +25,8 @@ COLORS = {
     "lightgray": "#BDBDBD"
 }
 
-GRAPH_BG = "#F5F5F5"  # fond très clair pour tous les graphiques
-GRAPH_HEIGHT = 360     # hauteur uniforme pour pie charts et gauge
+GRAPH_BG = "#F5F5F5"
+GRAPH_HEIGHT = 360
 
 # ==========================
 # SESSION STATE INIT
@@ -34,6 +35,8 @@ if "view" not in st.session_state:
     st.session_state.view = 1
 if "finance_data" not in st.session_state:
     st.session_state.finance_data = {}
+if "sentiment_data" not in st.session_state:
+    st.session_state.sentiment_data = {}
 if "selected_company" not in st.session_state:
     st.session_state.selected_company = "Apple Inc."
 if "mode" not in st.session_state:
@@ -140,8 +143,9 @@ st.markdown("<hr>", unsafe_allow_html=True)
 # ==========================
 ticker = [k for k, v in companies.items() if v == st.session_state.selected_company][0]
 
+# Load Financial Data
 if ticker not in st.session_state.finance_data:
-    with st.spinner(f"Loading data for {st.session_state.selected_company}..."):
+    with st.spinner(f"Loading financial data for {st.session_state.selected_company}..."):
         df_raw = get_stock_data(tickers=ticker, days_back=30, include_today=True)
         df_pct = get_pct_change_df(tickers=ticker, days_back=30, include_today=True)
 
@@ -156,12 +160,41 @@ if ticker not in st.session_state.finance_data:
         else:
             df_raw["price_change_pct"] = np.nan
 
-        df_raw["sentiment"] = np.random.uniform(-1, 1, size=len(df_raw))
         df_raw["nb_messages"] = np.random.randint(50, 1000, size=len(df_raw))
 
         st.session_state.finance_data[ticker] = df_raw
 
 df_fin = st.session_state.finance_data[ticker]
+
+# Load Sentiment Data (stocké dans le dictionnaire)
+if ticker not in st.session_state.sentiment_data:
+    with st.spinner(f"Loading sentiment data for {st.session_state.selected_company}..."):
+        try:
+            df_sentiment = main_analyse_textblob(ticker)
+            if df_sentiment is not None and not df_sentiment.empty:
+                df_sentiment['analysis_date'] = pd.to_datetime(df_sentiment['analysis_date']).dt.date
+                st.session_state.sentiment_data[ticker] = df_sentiment
+            else:
+                # Créer un dataframe vide si pas de données
+                st.session_state.sentiment_data[ticker] = pd.DataFrame()
+        except Exception as e:
+            st.warning(f"Erreur lors du chargement du sentiment: {e}")
+            st.session_state.sentiment_data[ticker] = pd.DataFrame()
+
+df_sentiment = st.session_state.sentiment_data[ticker]
+
+# Fusionner les données financières et de sentiment
+df_fin['date_only'] = df_fin['date'].dt.date
+
+if not df_sentiment.empty:
+    df_fin = df_fin.merge(df_sentiment[['analysis_date', 'GlobalScore', 'MessageCount']], 
+                          left_on='date_only', right_on='analysis_date', how='left')
+    df_fin['sentiment'] = df_fin['GlobalScore'].fillna(np.random.uniform(-1, 1, size=len(df_fin)))
+    df_fin['nb_messages'] = df_fin['MessageCount'].fillna(df_fin['nb_messages'])
+    df_fin = df_fin.drop(['date_only', 'analysis_date', 'GlobalScore', 'MessageCount'], axis=1)
+else:
+    df_fin['sentiment'] = np.random.uniform(-1, 1, size=len(df_fin))
+    df_fin = df_fin.drop(['date_only'], axis=1)
 
 # ==========================
 # KPI BOXES
@@ -220,7 +253,7 @@ with col_graph_title[0]:
 with col_graph_title[1]:
     if st.button("➡️", key="toggle_graph", help="Switch graph view"):
         st.session_state.view = 2 if st.session_state.view==1 else 1
-        st.rerun() 
+        st.rerun()
 
 fig_main = go.Figure()
 if st.session_state.view==1:
