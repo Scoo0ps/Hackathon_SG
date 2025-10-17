@@ -60,7 +60,7 @@ def score_compatibilite_df(y1: pd.DataFrame, y2: dict, col_name: str = None, max
     # Score prédiction (lag >= 0)
     if len(positive_corr) > 0:
         idx_max_pos = np.argmax(positive_corr)
-        score_prediction = (positive_corr[idx_max_pos] + 1) / 2 * 100
+        score_prediction = (positive_corr[idx_max_pos]) * 100
         lag_prediction = positive_lags[idx_max_pos]
     else:
         score_prediction = np.nan
@@ -69,7 +69,7 @@ def score_compatibilite_df(y1: pd.DataFrame, y2: dict, col_name: str = None, max
     # Score réaction (lag < 0)
     if len(negative_corr) > 0:
         idx_max_neg = np.argmax(negative_corr)
-        score_reaction = (negative_corr[idx_max_neg] + 1) / 2 * 100
+        score_reaction = (negative_corr[idx_max_neg]) * 100
         lag_reaction = negative_lags[idx_max_neg]
     else:
         score_reaction = np.nan
