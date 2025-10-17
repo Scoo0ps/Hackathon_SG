@@ -99,7 +99,7 @@ companies = {ticker: info["company"] for ticker, info in STOCK_KEYWORDS.items()}
 # HEADER
 # ==========================
 st.markdown(
-    f"<h1 style='color:{COLORS['accent']}; text-align:center; font-size:54px; font-weight:900; margin-bottom:10px;'>SG Market & Sentiment Dashboard</h1>",
+    f"<h1 style='color:{COLORS['accent']}; text-align:center; font-size:54px; font-weight:900; margin-bottom:30px; margin-top:20px;'>SG Market & Sentiment Dashboard</h1>",
     unsafe_allow_html=True
 )
 
@@ -189,8 +189,11 @@ df_fin['date_only'] = df_fin['date'].dt.date
 if not df_sentiment.empty:
     df_fin = df_fin.merge(df_sentiment[['analysis_date', 'GlobalScore', 'MessageCount']], 
                           left_on='date_only', right_on='analysis_date', how='left')
-    df_fin['sentiment'] = df_fin['GlobalScore'].fillna(np.random.uniform(-1, 1, size=len(df_fin)))
-    df_fin['nb_messages'] = df_fin['MessageCount'].fillna(df_fin['nb_messages'])
+    # Remplir les valeurs manquantes de sentiment
+    nan_mask = df_fin['GlobalScore'].isna()
+    df_fin.loc[nan_mask, 'GlobalScore'] = np.random.uniform(-1, 1, size=nan_mask.sum())
+    df_fin['sentiment'] = df_fin['GlobalScore']
+    df_fin['nb_messages'] = df_fin['MessageCount']
     df_fin = df_fin.drop(['date_only', 'analysis_date', 'GlobalScore', 'MessageCount'], axis=1)
 else:
     df_fin['sentiment'] = np.random.uniform(-1, 1, size=len(df_fin))
@@ -271,33 +274,43 @@ st.plotly_chart(fig_main, use_container_width=True, config={"displayModeBar": Fa
 # Pie charts + jauge
 # ==========================
 st.markdown("<br><br>", unsafe_allow_html=True)
-col_pie1, col_gauge, col_pie2 = st.columns([2,1,2])
 
-# Pie sentiment
-with col_pie1:
-    sentiment_counts = {
-        "Positive": np.sum(df_fin["sentiment"] > 0.2),
-        "Neutral": np.sum((df_fin["sentiment"] <= 0.2) & (df_fin["sentiment"] >= -0.2)),
-        "Negative": np.sum(df_fin["sentiment"] < -0.2)
-    }
-    fig_pie_sentiment = px.pie(names=list(sentiment_counts.keys()), values=list(sentiment_counts.values()), hole=0.4, color_discrete_sequence=[COLORS["accent"], COLORS["gray"], COLORS["inner"]], title="Sentiment Distribution")
-    fig_pie_sentiment.update_layout(paper_bgcolor=GRAPH_BG, plot_bgcolor=GRAPH_BG, title_font=dict(color="#333333"), font=dict(color="#333333"), height=GRAPH_HEIGHT)
-    st.plotly_chart(fig_pie_sentiment, use_container_width=True, config={"displayModeBar": False})
+# Configuration commune pour tous les graphiques
+chart_title_font = dict(size=16, color="#333333", family="Arial")
+chart_font = dict(size=12, color="#333333", family="Arial")
+
+# Afficher les charts selon le mode
+if st.session_state.mode == "⏳ Slow & more accurate":
+    col_pie1, col_gauge, col_pie2 = st.columns([2,1,2])
+    
+    # Pie sentiment (uniquement en mode Slow)
+    with col_pie1:
+        sentiment_counts = {
+            "Positive": np.sum(df_fin["sentiment"] > 0.2),
+            "Neutral": np.sum((df_fin["sentiment"] <= 0.2) & (df_fin["sentiment"] >= -0.2)),
+            "Negative": np.sum(df_fin["sentiment"] < -0.2)
+        }
+        fig_pie_sentiment = px.pie(names=list(sentiment_counts.keys()), values=list(sentiment_counts.values()), hole=0.4, color_discrete_sequence=[COLORS["accent"], COLORS["gray"], COLORS["inner"]], title="Sentiment Distribution")
+        fig_pie_sentiment.update_layout(paper_bgcolor=GRAPH_BG, plot_bgcolor=GRAPH_BG, title_font=chart_title_font, font=chart_font, height=GRAPH_HEIGHT, title_x=0.5)
+        st.plotly_chart(fig_pie_sentiment, use_container_width=True, config={"displayModeBar": False})
+else:
+    col_gauge, col_pie2 = st.columns([1,2])
 
 # Jauge
 with col_gauge:
     gauge_value = 42
     fig_gauge = go.Figure(go.Indicator(mode="gauge+number", value=gauge_value,
                                        gauge={'axis':{'range':[0,100]}, 'bar':{'color':COLORS['accent']}, 'bgcolor':GRAPH_BG},
-                                       number={'suffix':'%','font':{'color':'#333333'}}, title={'text':"Performance Score", 'font':{'color':'#333333'}}))
-    fig_gauge.update_layout(height=GRAPH_HEIGHT, paper_bgcolor=GRAPH_BG)
+                                       number={'suffix':'%','font':{'color':'#333333', 'size': 24}}, 
+                                       title={'text':"Performance Score", 'font':{'color':'#333333', 'size': 16, 'family': 'Arial'}}))
+    fig_gauge.update_layout(height=GRAPH_HEIGHT, paper_bgcolor=GRAPH_BG, margin=dict(l=20,r=20,t=60,b=20))
     st.plotly_chart(fig_gauge, use_container_width=True, config={"displayModeBar": False})
 
 # Pie sources
 with col_pie2:
     sources = {"Twitter": np.random.randint(40,60), "Reddit": np.random.randint(40,60)}
     fig_pie_sources = px.pie(names=list(sources.keys()), values=list(sources.values()), hole=0.4, color_discrete_sequence=[COLORS["accent"], COLORS["inner"]], title="Source Distribution")
-    fig_pie_sources.update_layout(paper_bgcolor=GRAPH_BG, plot_bgcolor=GRAPH_BG, title_font=dict(color="#333333"), font=dict(color="#333333"), height=GRAPH_HEIGHT)
+    fig_pie_sources.update_layout(paper_bgcolor=GRAPH_BG, plot_bgcolor=GRAPH_BG, title_font=chart_title_font, font=chart_font, height=GRAPH_HEIGHT, title_x=0.5)
     st.plotly_chart(fig_pie_sources, use_container_width=True, config={"displayModeBar": False})
 
 st.markdown(f"<div style='height:100px; background-color:{COLORS['bg']};'></div>", unsafe_allow_html=True)
