@@ -2,42 +2,23 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from stock_data.dataframe_percent import get_pct_change_df  # Ton import perso
+from stock_data.dataframe_percent import get_pct_change_df  # Ton module perso
+from sentiment_analysis_textblob import analyze_single_stock_textblob, analyze_single_stock_textblob, main_analyse_textblob   # Ton module perso
 
 
 def score_compatibilite_df(y1: pd.DataFrame, y2: dict, col_name: str = None) -> float:
     """
     Calcule un score de compatibilité (0–100) entre un DataFrame y1 indexé par date
-    et un dict y2 contenant au moins 'GlobalScore' et 'analysis_date'.
-
-    La conversion dict → DataFrame est automatique dans la fonction.
-
-    Paramètres
-    ----------
-    y1 : pd.DataFrame
-        DataFrame indexé par date, avec une ou plusieurs colonnes.
-    y2 : dict
-        Dictionnaire avec au moins les clés 'GlobalScore' (liste/array)
-        et 'analysis_date' (liste/array de dates).
-    col_name : str, optionnel
-        Nom de la colonne à utiliser pour y2 (par défaut, première colonne de y1).
-
-    Retour
-    -------
-    float
-        Score moyen de compatibilité entre 0 et 100, ou np.nan si pas calculable.
+    et un dict y2 contenant 'GlobalScore' et 'analysis_date'.
     """
-
-    # Déterminer le nom de colonne à utiliser dans y2
     if col_name is None:
         col_name = y1.columns[0]
 
-    # Conversion dict y2 en DataFrame
+    # Conversion dict -> DataFrame
     dates = pd.to_datetime(y2["analysis_date"])
     values = y2["GlobalScore"]
     y2_df = pd.DataFrame(data={col_name: values}, index=dates)
 
-    # Colonnes communes
     colonnes_communes = y1.columns.intersection(y2_df.columns)
     if len(colonnes_communes) == 0:
         print("⚠️ Pas de colonnes communes entre y1 et y2")
@@ -45,57 +26,62 @@ def score_compatibilite_df(y1: pd.DataFrame, y2: dict, col_name: str = None) -> 
 
     scores = []
     for col in colonnes_communes:
-        s1 = y1[col]
-        s2 = y2_df[col]
-
-        # Aligner sur dates communes
+        s1, s2 = y1[col], y2_df[col]
         s1, s2 = s1.align(s2, join='inner')
         if len(s1) < 2:
             continue
 
-        a = s1.to_numpy(dtype=float)
-        b = s2.to_numpy(dtype=float)
-
-        a = (a - np.mean(a)) / np.std(a)
-        b = (b - np.mean(b)) / np.std(b)
+        a = (s1 - s1.mean()) / s1.std()
+        b = (s2 - s2.mean()) / s2.std()
 
         corr = np.correlate(a, b, mode='full') / len(a)
         r_max = np.max(corr)
-
         score = (r_max + 1) / 2 * 100
         scores.append(score)
 
-    if len(scores) == 0:
+    if not scores:
         print("⚠️ Pas assez de données valides pour calculer le score")
         return np.nan
 
     return np.mean(scores)
 
 
-# --- TEST ---
-
+# --- MAIN ---
 if __name__ == "__main__":
-    # Chargement données réelles Apple
-    y1 = get_pct_change_df("AAPL")
+    ticker = "AAPL"
 
+    # 1️⃣ Analyse du sentiment via Reddit (TextBlob)
+    sentiment_df = main_analyse_textblob(ticker)
 
-    dates_30 = y1.index[-30:]
+    if sentiment_df is None or sentiment_df.empty:
+        print(f"⚠️ Aucune donnée d'analyse de sentiment disponible pour {ticker}.")
+        exit()
+
+    # Conversion du DataFrame en dict compatible
     y2_dict = {
-        "GlobalScore": np.sin(np.linspace(0, 4 * np.pi, len(dates_30)) - 1.5).tolist(),
-        "analysis_date": dates_30.strftime("%Y-%m-%d").tolist()
+        "GlobalScore": sentiment_df["GlobalScore"].tolist(),
+        "analysis_date": sentiment_df["analysis_date"].astype(str).tolist()
     }
 
-    # Calcul du score (conversion dict intégrée)
-    score = score_compatibilite_df(y1.loc[dates_30], y2_dict)
-    print(f"Score de compatibilité moyen sur les 30 derniers jours : {score:.2f}/100")
+    # 2️⃣ Récupération du % de variation boursière
+    y1 = get_pct_change_df(ticker)
 
-    # Visualisation
+    # Restreindre la période à celle du sentiment
+    min_date = pd.to_datetime(min(y2_dict["analysis_date"]))
+    max_date = pd.to_datetime(max(y2_dict["analysis_date"]))
+    y1 = y1.loc[min_date:max_date]
+
+    # 3️⃣ Calcul du score de compatibilité
+    score = score_compatibilite_df(y1, y2_dict)
+    print(f"Score de compatibilité moyen : {score:.2f}/100")
+
+    # 4️⃣ Visualisation
     plt.figure(figsize=(12, 6))
-    plt.plot(y1.loc[dates_30].index, y1.loc[dates_30].iloc[:, 0], label=f"{y1.columns[0]} (réel)")
-    plt.plot(pd.to_datetime(y2_dict["analysis_date"]), y2_dict["GlobalScore"], label="GlobalScore (dict synthétique)")
-    plt.title(f"Score de compatibilité (30 derniers jours) : {score:.2f}/100")
+    plt.plot(y1.index, y1.iloc[:, 0], label=f"{y1.columns[0]} (% de variation réelle)")
+    plt.plot(pd.to_datetime(y2_dict["analysis_date"]), y2_dict["GlobalScore"], label="Sentiment Reddit (GlobalScore)")
+    plt.title(f"{ticker} - Score de compatibilité : {score:.2f}/100")
     plt.xlabel("Date")
-    plt.ylabel("Valeurs")
+    plt.ylabel("Valeur")
     plt.legend()
     plt.grid(True)
     plt.show()
