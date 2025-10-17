@@ -165,8 +165,6 @@ if ticker not in st.session_state.finance_data:
         else:
             df_raw["price_change_pct"] = np.nan
 
-        df_raw["nb_messages"] = np.random.randint(50, 1000, size=len(df_raw))
-
         st.session_state.finance_data[ticker] = df_raw
 
 df_fin = st.session_state.finance_data[ticker]
@@ -362,8 +360,14 @@ if st.session_state.mode == "⚡ Fast & less accurate":
                 'bar': {'color': COLORS["accent"]},
                 'bgcolor': COLORS['bg']
             },
-            number={ 'font': {'color': COLORS['text'], 'size': 24}}
+            number={'suffix': '%', 'font': {'color': COLORS['text'], 'size': 24}}
         ))
+        # Ajuster le domaine pour les valeurs négatives
+        if score_pred < 0:
+            fig_gauge1.update_traces(
+                gauge=dict(axis=dict(range=[100, 0])),
+                selector=dict(type='indicator')
+            )
         fig_gauge1.update_layout(
             height=GRAPH_HEIGHT,
             paper_bgcolor=COLORS['bg'],
@@ -390,6 +394,12 @@ if st.session_state.mode == "⚡ Fast & less accurate":
             },
             number={'suffix': '%', 'font': {'color': COLORS['text'], 'size': 24}}
         ))
+        # Ajuster le domaine pour les valeurs négatives
+        if score_reac < 0:
+            fig_gauge2.update_traces(
+                gauge=dict(axis=dict(range=[100, 0])),
+                selector=dict(type='indicator')
+            )
         fig_gauge2.update_layout(
             height=GRAPH_HEIGHT,
             paper_bgcolor=COLORS['bg'],
@@ -402,7 +412,15 @@ if st.session_state.mode == "⚡ Fast & less accurate":
     # Camembert Sources
     with col_pie:
         st.markdown(f"<h3 style='color:{COLORS['text']}; text-align:center; margin-bottom:10px;'>Source Distribution</h3>", unsafe_allow_html=True)
-        sources = {"Twitter": np.random.randint(40,60), "Reddit": np.random.randint(40,60)}
+        
+        # Utiliser les vraies données depuis df_sentiment
+        if not df_sentiment.empty and 'NbRedditTot' in df_sentiment.columns and 'NbBloombergTot' in df_sentiment.columns:
+            nb_reddit = df_sentiment["NbRedditTot"].iloc[0] if len(df_sentiment) > 0 else 0
+            nb_bloomberg = df_sentiment["NbBloombergTot"].iloc[0] if len(df_sentiment) > 0 else 0
+            sources = {"Reddit": nb_reddit, "Bloomberg": nb_bloomberg}
+        else:
+            sources = {"Reddit": 0, "Bloomberg": 0}
+        
         fig_pie_sources = px.pie(
             names=list(sources.keys()),
             values=list(sources.values()),
@@ -465,7 +483,15 @@ else:
     
     with col_pie2:
         st.markdown(f"<h3 style='color:{COLORS['text']}; text-align:center; margin-bottom:10px;'>Source Distribution</h3>", unsafe_allow_html=True)
-        sources = {"Twitter": np.random.randint(40,60), "Reddit": np.random.randint(40,60)}
+        
+        # Utiliser les vraies données depuis df_sentiment
+        if not df_sentiment.empty and 'NbRedditTot' in df_sentiment.columns and 'NbBloombergTot' in df_sentiment.columns:
+            nb_reddit = df_sentiment["NbRedditTot"].iloc[0] if len(df_sentiment) > 0 else 0
+            nb_bloomberg = df_sentiment["NbBloombergTot"].iloc[0] if len(df_sentiment) > 0 else 0
+            sources = {"Reddit": nb_reddit, "Bloomberg": nb_bloomberg}
+        else:
+            sources = {"Reddit": 0, "Bloomberg": 0}
+        
         fig_pie_sources = px.pie(
             names=list(sources.keys()),
             values=list(sources.values()),
@@ -504,31 +530,12 @@ else:
             },
             number={'suffix': '%', 'font': {'color': COLORS['text'], 'size': 24}}
         ))
-        fig_gauge1.update_layout(
-            height=GRAPH_HEIGHT,
-            paper_bgcolor=COLORS['bg'],
-            font=dict(size=12, color="#FFFFFF"),
-            margin=dict(l=20, r=20, t=20, b=60)
-        )
-        st.plotly_chart(fig_gauge1, use_container_width=True, config={"displayModeBar": False})
-        st.markdown(f"<p style='color:{COLORS['gray']}; text-align:center; margin-top:-40px;'>Lag: {lag_pred} days</p>", unsafe_allow_html=True)
-    
-    with col_gauge2:
-        st.markdown(f"<h3 style='color:{COLORS['text']}; text-align:center; margin-bottom:10px;'>Reaction Score</h3>", unsafe_allow_html=True)
-        
-        score_reac = scores["score_reaction"] if not np.isnan(scores["score_reaction"]) else 0
-        lag_reac = scores["lag_reaction"] if scores["lag_reaction"] is not None else 0
-        
-        fig_gauge2 = go.Figure(go.Indicator(
-            mode="gauge+number",
-            value=score_reac,
-            gauge={
-                'axis': {'range': [0, 100]},
-                'bar': {'color': COLORS["accent"]},
-                'bgcolor': COLORS['bg']
-            },
-            number={'suffix': '%', 'font': {'color': COLORS['text'], 'size': 24}}
-        ))
+        # Ajuster le domaine pour les valeurs négatives
+        if score_pred < 0:
+            fig_gauge1.update_traces(
+                gauge=dict(axis=dict(range=[100, 0])),
+                selector=dict(type='indicator')
+            )
         fig_gauge2.update_layout(
             height=GRAPH_HEIGHT,
             paper_bgcolor=COLORS['bg'],
