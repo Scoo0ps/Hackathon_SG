@@ -8,6 +8,8 @@ import plotly.express as px
 from stock_data.dict_per_stock import get_stock_data
 from stock_data.dataframe_percent import get_pct_change_df
 from sentiment_analysis_textblob import main_analyse_textblob
+from sentiment_analysis_finbert import main_analyse_finbert
+
 from correlation import score_compatibilite_df
 
 # ==========================
@@ -44,6 +46,8 @@ if "mode" not in st.session_state:
     st.session_state.mode = "⚡ Fast & less accurate"
 if "selected_date" not in st.session_state:
     st.session_state.selected_date = (datetime.now() - timedelta(days=1)).date()
+if "previous_mode" not in st.session_state:
+    st.session_state.previous_mode = "⚡ Fast & less accurate"
 
 # ==========================
 # CSS
@@ -77,9 +81,6 @@ STOCK_KEYWORDS = {
     # French CAC 40 Stocks
     "AIR.PA": {"company": "Airbus SE"},
     "MC.PA": {"company": "LVMH Moët Hennessy Louis Vuitton SE"},
-    "DG.PA": {"company": "Vinci SA"},
-    "SU.PA": {"company": "Schneider Electric SE"},
-    "ENGI.PA": {"company": "Engie SA"},
     # US Tech & Blue Chip
     "AAPL": {"company": "Apple Inc."},
     "MSFT": {"company": "Microsoft Corporation"},
@@ -107,13 +108,21 @@ st.markdown(
 col_mode, col_company, col_date = st.columns([2, 3, 2])
 
 with col_mode:
-    st.session_state.mode = st.radio(
+    mode_selected = st.radio(
         "Mode selection:",
         ["⚡ Fast & less accurate", "⏳ Slow & more accurate"],
         horizontal=True,
         index=0 if st.session_state.mode=="⚡ Fast & less accurate" else 1,
         key="mode_radio"
     )
+    
+    # Détecter le changement de mode et réinitialiser les données sentiment
+    if mode_selected != st.session_state.previous_mode:
+        st.session_state.sentiment_data = {}
+        st.session_state.previous_mode = mode_selected
+        st.session_state.mode = mode_selected
+    else:
+        st.session_state.mode = mode_selected
 
 with col_company:
     st.session_state.selected_company = st.selectbox(
@@ -164,30 +173,41 @@ if ticker not in st.session_state.finance_data:
 
 df_fin = st.session_state.finance_data[ticker]
 
-# Load Sentiment Data (stocké dans le dictionnaire)
+# ==========================
+# LOAD SENTIMENT DATA
+# ==========================
 if ticker not in st.session_state.sentiment_data:
     with st.spinner(f"Loading sentiment data for {st.session_state.selected_company}..."):
         try:
-            df_sentiment = main_analyse_textblob(ticker)
+            # Choix du mode d'analyse
+            if st.session_state.mode == "⏳ Slow & more accurate":
+                df_sentiment = main_analyse_finbert(ticker)
+            else:
+                df_sentiment = main_analyse_textblob(ticker)
+
+            # Vérifier si on a des résultats
             if df_sentiment is not None and not df_sentiment.empty:
                 df_sentiment['analysis_date'] = pd.to_datetime(df_sentiment['analysis_date']).dt.date
                 st.session_state.sentiment_data[ticker] = df_sentiment
             else:
-                # Créer un dataframe vide si pas de données
+                # DataFrame vide si pas de messages
                 st.session_state.sentiment_data[ticker] = pd.DataFrame()
+
         except Exception as e:
             st.warning(f"Erreur lors du chargement du sentiment: {e}")
             st.session_state.sentiment_data[ticker] = pd.DataFrame()
 
 df_sentiment = st.session_state.sentiment_data[ticker]
 
-# Fusionner les données financières et de sentiment
+# Fusionner avec les données financières
 df_fin['date_only'] = df_fin['date'].dt.date
 
 if not df_sentiment.empty:
-    df_fin = df_fin.merge(df_sentiment[['analysis_date', 'GlobalScore', 'MessageCount']], 
-                          left_on='date_only', right_on='analysis_date', how='left')
-    # Si pas de messages, laisser NaN
+    df_fin = df_fin.merge(
+        df_sentiment[['analysis_date', 'GlobalScore', 'MessageCount']], 
+        left_on='date_only', right_on='analysis_date', how='left'
+    )
+    # Si pas de données pour certains jours, mettre NaN au lieu d'inventer
     df_fin['sentiment'] = df_fin['GlobalScore']
     df_fin['nb_messages'] = df_fin['MessageCount']
     df_fin = df_fin.drop(['date_only', 'analysis_date', 'GlobalScore', 'MessageCount'], axis=1)
@@ -217,7 +237,7 @@ metrics = {
 
 for i, (label, value) in enumerate(metrics.items()):
     if label == "Volume" and value is not None and not pd.isna(value):
-        val_display = f"{value/1_000_000_000:.2f} B"
+        val_display = f"{int(value):,}".replace(",", " ")
     elif label != "Volume" and value is not None and not pd.isna(value):
         val_display = f"{value:.2f}"
     else:
@@ -287,49 +307,70 @@ else:
         paper_bgcolor=GRAPH_BG
     )
 
-st.plotly_chart(fig_main, use_container_width=True, config={"displayModeBar": False})
+# Afficher avec bouton de zoom activé
+st.plotly_chart(fig_main, use_container_width=True, config={"displayModeBar": True, "displaylogo": False})
 
 # ==========================
 # Pie charts + jauge
 # ==========================
 st.markdown("<br><br>", unsafe_allow_html=True)
 
-chart_title_font = dict(size=16, color="#333333", family="Arial", weight='bold')
-chart_font = dict(size=12, color="#333333", family="Arial")
+chart_title_font = dict(size=18, color="#FFFFFF", family="Arial", weight='bold')
+chart_font = dict(size=12, color="#FFFFFF", family="Arial")
 
 if st.session_state.mode == "⏳ Slow & more accurate":
+    # Mode avec 3 graphiques
     col_pie1, col_gauge, col_pie2 = st.columns([2,1,2])
     
     # Pie sentiment
     with col_pie1:
-        sentiment_counts = {
-            "Positive": np.sum(df_fin["sentiment"] > 0.2),
-            "Neutral": np.sum((df_fin["sentiment"] <= 0.2) & (df_fin["sentiment"] >= -0.2)),
-            "Negative": np.sum(df_fin["sentiment"] < -0.2)
-        }
+        st.markdown(f"<h3 style='color:{COLORS['text']}; text-align:center; margin-bottom:10px;'>Sentiment Distribution</h3>", unsafe_allow_html=True)
+        
+        # Utiliser les colonnes Positive, Neutral, Negative du DataFrame sentiment
+        if not df_sentiment.empty and all(col in df_sentiment.columns for col in ['Positive', 'Neutral', 'Negative']):
+            # Calculer la somme totale des scores sur tout le mois
+            total_positive = df_sentiment["Positive"].sum()
+            total_neutral = df_sentiment["Neutral"].sum()
+            total_negative = df_sentiment["Negative"].sum()
+            
+            sentiment_counts = {
+                "Positive": total_positive,
+                "Neutral": total_neutral,
+                "Negative": total_negative
+            }
+        else:
+            # Fallback si les données ne sont pas disponibles
+            sentiment_counts = {
+                "Positive": 0,
+                "Neutral": 0,
+                "Negative": 0
+            }
+        
         fig_pie_sentiment = px.pie(
             names=list(sentiment_counts.keys()),
             values=list(sentiment_counts.values()),
             hole=0.4,
-            color_discrete_sequence=[COLORS["accent"], COLORS["gray"], COLORS["inner"]],
-            title="Sentiment Distribution"
+            color_discrete_sequence=[COLORS["gray"], "#FFFFFF", COLORS["accent"]]  # Gris, Blanc, Rouge
         )
         fig_pie_sentiment.update_layout(
-            paper_bgcolor=GRAPH_BG,
-            plot_bgcolor=GRAPH_BG,
-            title_font=chart_title_font,
-            font=chart_font,
+            paper_bgcolor=COLORS['bg'],
+            plot_bgcolor=COLORS['bg'],
+            font=dict(size=12, color="#FFFFFF", family="Arial"),
             height=GRAPH_HEIGHT,
-            title_x=0.5
+            showlegend=True,
+            legend=dict(font=dict(color="#FFFFFF")),
+            margin=dict(l=20, r=20, t=20, b=20)
         )
         st.plotly_chart(fig_pie_sentiment, use_container_width=True, config={"displayModeBar": False})
 else:
-    col_gauge, col_pie2 = st.columns([1,2])
+    # Mode avec 2 graphiques (plus larges)
+    col_gauge, col_pie2 = st.columns([1,1])
 
 # ==========================
 # JAUGE - Performance Score
 # ==========================
 with col_gauge:
+    st.markdown(f"<h3 style='color:{COLORS['text']}; text-align:center; margin-bottom:10px;'>Performance Score</h3>", unsafe_allow_html=True)
     try:
         if not df_sentiment.empty:
             y2_dict = {
@@ -350,13 +391,8 @@ with col_gauge:
 
     if np.isnan(gauge_value):
         gauge_value = 0
-        gauge_color = "#BDBDBD"
-    elif gauge_value >= 70:
-        gauge_color = "#00C853"
-    elif gauge_value >= 40:
-        gauge_color = "#FFD600"
-    else:
-        gauge_color = "#D90429"
+    
+    gauge_color = COLORS["accent"]  # Toujours rouge
 
     fig_gauge = go.Figure(go.Indicator(
         mode="gauge+number",
@@ -364,37 +400,36 @@ with col_gauge:
         gauge={
             'axis': {'range': [0, 100]},
             'bar': {'color': gauge_color},
-            'bgcolor': GRAPH_BG
+            'bgcolor': COLORS['bg']
         },
-        number={'suffix': '%', 'font': {'color': '#333333', 'size': 24}},
-        title={'text': "Performance Score", 'font': {'color': '#333333', 'size': 16, 'family': 'Arial'}}
+        number={'suffix': '%', 'font': {'color': COLORS['text'], 'size': 24}}
     ))
     fig_gauge.update_layout(
         height=GRAPH_HEIGHT,
-        paper_bgcolor=GRAPH_BG,
-        title_font=chart_title_font,
+        paper_bgcolor=COLORS['bg'],
         font=chart_font,
-        margin=dict(l=20, r=20, t=60, b=20)
+        margin=dict(l=20, r=20, t=20, b=20)
     )
     st.plotly_chart(fig_gauge, use_container_width=True, config={"displayModeBar": False})
 
 # Pie sources
 with col_pie2:
+    st.markdown(f"<h3 style='color:{COLORS['text']}; text-align:center; margin-bottom:10px;'>Source Distribution</h3>", unsafe_allow_html=True)
     sources = {"Twitter": np.random.randint(40,60), "Reddit": np.random.randint(40,60)}
     fig_pie_sources = px.pie(
         names=list(sources.keys()),
         values=list(sources.values()),
         hole=0.4,
-        color_discrete_sequence=[COLORS["accent"], COLORS["inner"]],
-        title="Source Distribution"
+        color_discrete_sequence=[COLORS["accent"], COLORS["inner"]]
     )
     fig_pie_sources.update_layout(
-        paper_bgcolor=GRAPH_BG,
-        plot_bgcolor=GRAPH_BG,
-        title_font=chart_title_font,
-        font=chart_font,
+        paper_bgcolor=COLORS['bg'],
+        plot_bgcolor=COLORS['bg'],
+        font=dict(size=12, color="#FFFFFF", family="Arial"),
         height=GRAPH_HEIGHT,
-        title_x=0.5
+        showlegend=True,
+        legend=dict(font=dict(color="#FFFFFF")),
+        margin=dict(l=20, r=20, t=20, b=20)
     )
     st.plotly_chart(fig_pie_sources, use_container_width=True, config={"displayModeBar": False})
 
